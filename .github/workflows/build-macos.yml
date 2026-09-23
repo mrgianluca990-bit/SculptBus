@@ -1,0 +1,67 @@
+name: Build Sculpt Bus macOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-macos:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure universal macOS build
+        run: |
+          cmake -S . -B build -G Xcode             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Build Release
+        run: |
+          cmake --build build --config Release --parallel 3
+
+      - name: Ad-hoc sign VST3
+        run: |
+          codesign --force --deep --sign - "build/SculptBus_artefacts/Release/VST3/Sculpt Bus.vst3"
+
+      - name: Ad-hoc sign AU
+        run: |
+          codesign --force --deep --sign - "build/SculptBus_artefacts/Release/AU/Sculpt Bus.component"
+
+      - name: Ad-hoc sign Standalone
+        run: |
+          codesign --force --deep --sign - "build/SculptBus_artefacts/Release/Standalone/Sculpt Bus.app"
+
+      - name: Verify VST3
+        run: |
+          test -d "build/SculptBus_artefacts/Release/VST3/Sculpt Bus.vst3"
+
+      - name: Verify AU
+        run: |
+          test -d "build/SculptBus_artefacts/Release/AU/Sculpt Bus.component"
+
+      - name: Verify Standalone
+        run: |
+          test -d "build/SculptBus_artefacts/Release/Standalone/Sculpt Bus.app"
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: SculptBus-VST3-macOS-universal
+          path: build/SculptBus_artefacts/Release/VST3/Sculpt Bus.vst3
+          if-no-files-found: error
+
+      - name: Upload AU
+        uses: actions/upload-artifact@v4
+        with:
+          name: SculptBus-AU-macOS-universal
+          path: build/SculptBus_artefacts/Release/AU/Sculpt Bus.component
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: SculptBus-Standalone-macOS-universal
+          path: build/SculptBus_artefacts/Release/Standalone/Sculpt Bus.app
+          if-no-files-found: error
