@@ -91,8 +91,8 @@ void SculptBusLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButt
 SculptBusAudioProcessorEditor::SculptBusAudioProcessorEditor (SculptBusAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
-    background = juce::ImageFileFormat::loadFrom (BinaryData::sculpt_bus_gui_bg_clean_png,
-                                                  BinaryData::sculpt_bus_gui_bg_clean_pngSize);
+    background = juce::ImageFileFormat::loadFrom (BinaryData::sculpt_bus_gui_bg_v03_png,
+                                                  BinaryData::sculpt_bus_gui_bg_v03_pngSize);
     setLookAndFeel (&look);
 
     setupKnob (low, "low");
@@ -175,16 +175,16 @@ void SculptBusAudioProcessorEditor::drawAllMeters (juce::Graphics& g)
     float sx = (float) getWidth() / 1672.0f;
     float sy = (float) getHeight() / 941.0f;
 
-    drawSegmentMeter (g, { 1142 * sx, 87 * sy, 307 * sx, 25 * sy }, processor.getInputMeter(), 19);
-    drawSegmentMeter (g, { 1142 * sx, 162 * sy, 307 * sx, 25 * sy }, processor.getOutputMeter(), 19);
+    drawSegmentMeter (g, { 1142 * sx, 88 * sy, 306 * sx, 23 * sy }, processor.getInputMeter(), 19);
+    drawSegmentMeter (g, { 1142 * sx, 163 * sy, 306 * sx, 23 * sy }, processor.getOutputMeter(), 19);
 
-    const int xs[4] = { 194, 500, 804, 1104 };
-    const int ys[3] = { 498, 546, 593 };
+    const int xs[4] = { 196, 502, 806, 1106 };
+    const int ys[3] = { 500, 548, 595 };
     for (int b = 0; b < 4; ++b)
     {
-        drawSegmentMeter (g, { xs[b] * sx, ys[0] * sy, 184 * sx, 22 * sy }, processor.getResMeter (b), 12);
-        drawSegmentMeter (g, { xs[b] * sx, ys[1] * sy, 184 * sx, 22 * sy }, processor.getCompMeter (b), 12);
-        drawSegmentMeter (g, { xs[b] * sx, ys[2] * sy, 184 * sx, 22 * sy }, processor.getSatMeter (b), 12);
+        drawSegmentMeter (g, { xs[b] * sx, ys[0] * sy, 180 * sx, 18 * sy }, processor.getResMeter (b), 12);
+        drawSegmentMeter (g, { xs[b] * sx, ys[1] * sy, 180 * sx, 18 * sy }, processor.getCompMeter (b), 12);
+        drawSegmentMeter (g, { xs[b] * sx, ys[2] * sy, 180 * sx, 18 * sy }, processor.getSatMeter (b), 12);
     }
 }
 
@@ -198,21 +198,21 @@ void SculptBusAudioProcessorEditor::paint (juce::Graphics& g)
 
 void SculptBusAudioProcessorEditor::resized()
 {
-    // Carefully aligned against the BUS artwork at 1672 x 941.
-    low.slider.setBounds      (scaledRect (180, 338, 176, 176));
-    mid.slider.setBounds      (scaledRect (482, 338, 176, 176));
-    high.slider.setBounds     (scaledRect (780, 338, 176, 176));
-    presence.slider.setBounds (scaledRect (1079, 338, 176, 176));
-    output.slider.setBounds   (scaledRect (1375, 365, 124, 124));
-    variationButton.setBounds (scaledRect (1366, 548, 126, 74));
+    // Coordinates are centred on the actual scale axes of the 1672 x 941 artwork.
+    low.slider.setBounds      (scaledRect (185, 302, 164, 164));   // centre 267,384
+    mid.slider.setBounds      (scaledRect (489, 302, 164, 164));   // centre 571,384
+    high.slider.setBounds     (scaledRect (786, 302, 164, 164));   // centre 868,384
+    presence.slider.setBounds (scaledRect (1085,302,164,164));     // centre 1167,384
+    output.slider.setBounds   (scaledRect (1378,333,124,124));     // centre 1440,395
+    variationButton.setBounds (scaledRect (1418,487,83,65));       // centre ~1459,521
 
-    density.slider.setBounds  (scaledRect (332, 692, 104, 104));
-    body.slider.setBounds     (scaledRect (524, 692, 104, 104));
-    detail.slider.setBounds   (scaledRect (716, 692, 104, 104));
-    glue.slider.setBounds     (scaledRect (901, 684, 118, 118));
-    punch.slider.setBounds    (scaledRect (1100, 692, 104, 104));
-    space.slider.setBounds    (scaledRect (1292, 692, 104, 104));
-    mix.slider.setBounds      (scaledRect (1484, 692, 104, 104));
+    density.slider.setBounds  (scaledRect (331,692,104,104));      // centre 383,744
+    body.slider.setBounds     (scaledRect (506,692,104,104));      // centre 558,744
+    detail.slider.setBounds   (scaledRect (683,692,104,104));      // centre 735,744
+    glue.slider.setBounds     (scaledRect (851,684,120,120));      // centre 911,744
+    punch.slider.setBounds    (scaledRect (1042,692,104,104));     // centre 1094,744
+    space.slider.setBounds    (scaledRect (1218,692,104,104));     // centre 1270,744
+    mix.slider.setBounds      (scaledRect (1395,692,104,104));     // centre 1447,744
 }
 
 void SculptBusAudioProcessorEditor::timerCallback()

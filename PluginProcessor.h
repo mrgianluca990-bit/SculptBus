@@ -95,6 +95,8 @@ private:
 
     float busCompEnv = 0.0f;
     float busCompGain = 1.0f;
+    float punchFastEnv = 0.0f;
+    float punchSlowEnv = 0.0f;
 
     std::array<float, numMacroBands> soothePressure {};
 

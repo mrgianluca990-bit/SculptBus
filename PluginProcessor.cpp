@@ -169,6 +169,8 @@ void SculptBusAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
     fineDry.setSize ((int) channels, maxInternalBlockSize, false, false, true);
     busCompEnv = 0.0f;
     busCompGain = 1.0f;
+    punchFastEnv = 0.0f;
+    punchSlowEnv = 0.0f;
     busCompMeter.store (0.0f);
 
     outputGain.reset (sampleRate, 0.04);
@@ -884,18 +886,15 @@ void SculptBusAudioProcessor::processBusCompressor (juce::AudioBuffer<float>& bu
         return;
     }
 
-    // Classic bus-compressor behaviour:
-    // linked stereo detector, moderate ratios, slower attack, program-friendly release.
-    const float attackMs = juce::jmap (punch, -1.0f, 1.0f, 8.0f, 32.0f);
-    const float releaseMs = juce::jmap (glue, 0.0f, 1.0f, 260.0f, 120.0f);
-    const float thresholdDb = juce::jmap (glue, 0.0f, 1.0f, -1.5f, -12.0f);
+    // Stereo-linked classic bus-compressor style stage.
+    // 30 ms attack keeps transients, release tightens progressively, ratio rises toward 4:1.
+    const float attackMs = juce::jmap (punch, -1.0f, 1.0f, 10.0f, 30.0f);
+    const float releaseMs = juce::jmap (glue, 0.0f, 1.0f, 260.0f, 95.0f);
+    const float thresholdDb = juce::jmap (glue, 0.0f, 1.0f, -2.0f, -18.0f);
     const float ratio = juce::jmap (glue, 0.0f, 1.0f, 1.5f, 4.0f);
 
-    const float attackCoeff = std::exp (
-        -1.0f / (float) (internalSampleRate * attackMs * 0.001));
-
-    const float releaseCoeff = std::exp (
-        -1.0f / (float) (internalSampleRate * releaseMs * 0.001));
+    const float attackCoeff = std::exp (-1.0f / (float) (internalSampleRate * attackMs * 0.001));
+    const float releaseCoeff = std::exp (-1.0f / (float) (internalSampleRate * releaseMs * 0.001));
 
     float maxGrDb = 0.0f;
 
@@ -911,26 +910,23 @@ void SculptBusAudioProcessor::processBusCompressor (juce::AudioBuffer<float>& bu
         const float envDb = juce::Decibels::gainToDecibels (busCompEnv + 1.0e-8f, -120.0f);
         const float overDb = juce::jmax (0.0f, envDb - thresholdDb);
         const float grDb = overDb * (1.0f - 1.0f / ratio);
-
         maxGrDb = juce::jmax (maxGrDb, grDb);
 
         const float targetGain = juce::Decibels::decibelsToGain (-grDb);
-        const float gainCoeff = targetGain < busCompGain ? attackCoeff : releaseCoeff;
-        busCompGain = gainCoeff * busCompGain + (1.0f - gainCoeff) * targetGain;
+        const float coeff = targetGain < busCompGain ? attackCoeff : releaseCoeff;
+        busCompGain = coeff * busCompGain + (1.0f - coeff) * targetGain;
 
-        // Gentle automatic makeup, intentionally not full loudness matching.
-        const float makeupDb = 1.25f * glue;
-        const float makeup = juce::Decibels::decibelsToGain (makeupDb);
-
+        // Musical partial makeup rather than level-match behaviour.
+        const float makeup = juce::Decibels::decibelsToGain (2.8f * glue);
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.setSample (ch, i, buffer.getSample (ch, i) * busCompGain * makeup);
     }
 
-    busCompMeter.store (juce::jlimit (0.0f, 1.0f, maxGrDb / 6.0f));
+    busCompMeter.store (juce::jlimit (0.0f, 1.0f, maxGrDb / 10.0f));
 }
 
 void SculptBusAudioProcessor::processFineTune (juce::AudioBuffer<float>& wet,
-                                               const juce::AudioBuffer<float>& dry)
+                                               const juce::AudioBuffer<float>& postBandsDry)
 {
     const float density = apvts.getRawParameterValue ("density")->load() / 100.0f;
     const float body = apvts.getRawParameterValue ("body")->load() / 100.0f;
@@ -940,7 +936,7 @@ void SculptBusAudioProcessor::processFineTune (juce::AudioBuffer<float>& wet,
     const float space = apvts.getRawParameterValue ("space")->load() / 100.0f;
     const float mix = apvts.getRawParameterValue ("mix")->load() / 100.0f;
 
-    // BODY: very broad, mastering-style ±2 dB low contour.
+    // BODY: broad but now clearly audible, up to about +/-5 dB in the low foundation.
     if (std::abs (body) > 0.001f)
     {
         bodyFilter.work.setSize (wet.getNumChannels(), wet.getNumSamples(), false, false, true);
@@ -948,13 +944,12 @@ void SculptBusAudioProcessor::processFineTune (juce::AudioBuffer<float>& wet,
         juce::dsp::AudioBlock<float> block (bodyFilter.work);
         juce::dsp::ProcessContextReplacing<float> ctx (block);
         bodyFilter.filter.process (ctx);
-
-        const float g = juce::Decibels::decibelsToGain (2.0f * body) - 1.0f;
+        const float g = juce::Decibels::decibelsToGain (5.0f * body) - 1.0f;
         for (int ch = 0; ch < wet.getNumChannels(); ++ch)
             wet.addFrom (ch, 0, bodyFilter.work, ch, 0, wet.getNumSamples(), g);
     }
 
-    // DETAIL: broad ±2 dB top contour.
+    // DETAIL: up to about +/-5 dB of broad high-frequency contour.
     if (std::abs (detail) > 0.001f)
     {
         detailFilter.work.setSize (wet.getNumChannels(), wet.getNumSamples(), false, false, true);
@@ -962,39 +957,65 @@ void SculptBusAudioProcessor::processFineTune (juce::AudioBuffer<float>& wet,
         juce::dsp::AudioBlock<float> block (detailFilter.work);
         juce::dsp::ProcessContextReplacing<float> ctx (block);
         detailFilter.filter.process (ctx);
-
-        const float g = juce::Decibels::decibelsToGain (2.0f * detail) - 1.0f;
+        const float g = juce::Decibels::decibelsToGain (5.0f * detail) - 1.0f;
         for (int ch = 0; ch < wet.getNumChannels(); ++ch)
             wet.addFrom (ch, 0, detailFilter.work, ch, 0, wet.getNumSamples(), g);
     }
 
-    // DENSITY: subtle full-range soft saturation, meant for 5-30% use.
+    // DENSITY: noticeably stronger post-band analogue-style thickening.
     if (density > 0.001f)
     {
-        const float drive = 1.0f + 1.8f * density;
-        const float blend = 0.20f * density;
+        const float shaped = std::pow (density, 0.75f);
+        const float drive = 1.0f + 4.0f * shaped;
+        const float blend = 0.55f * shaped;
         for (int ch = 0; ch < wet.getNumChannels(); ++ch)
         {
             auto* p = wet.getWritePointer (ch);
             for (int i = 0; i < wet.getNumSamples(); ++i)
             {
                 const float x = p[i];
-                const float y = std::tanh (x * drive);
+                const float y1 = std::tanh (x * drive);
+                const float y2 = std::tanh (y1 * (1.0f + 0.8f * shaped));
+                const float y = y1 + (y2 - y1) * (0.45f * shaped);
                 p[i] = x + (y - x) * blend;
             }
         }
     }
 
-    // GLUE + PUNCH: true linked stereo bus compressor.
+    // GLUE is the dedicated stereo-linked bus compressor.
     processBusCompressor (wet, glue, punch);
 
-    // SPACE: modest M/S width trim, only ±12%.
+    // PUNCH: independent transient fine tuning, so it remains audible even at low Glue.
+    if (std::abs (punch) > 0.001f)
+    {
+        const float fastCoeff = std::exp (-1.0f / (float) (internalSampleRate * 0.004));
+        const float slowCoeff = std::exp (-1.0f / (float) (internalSampleRate * 0.045));
+        const float amount = 0.42f * punch;
+
+        for (int i = 0; i < wet.getNumSamples(); ++i)
+        {
+            float detector = 0.0f;
+            for (int ch = 0; ch < wet.getNumChannels(); ++ch)
+                detector = juce::jmax (detector, std::abs (wet.getSample (ch, i)));
+
+            punchFastEnv = fastCoeff * punchFastEnv + (1.0f - fastCoeff) * detector;
+            punchSlowEnv = slowCoeff * punchSlowEnv + (1.0f - slowCoeff) * detector;
+
+            const float transient = juce::jlimit (-1.0f, 1.0f,
+                (punchFastEnv - punchSlowEnv) / (punchSlowEnv + 0.02f));
+            const float gain = juce::jlimit (0.70f, 1.35f, 1.0f + transient * amount);
+
+            for (int ch = 0; ch < wet.getNumChannels(); ++ch)
+                wet.setSample (ch, i, wet.getSample (ch, i) * gain);
+        }
+    }
+
+    // SPACE: now useful over a wider but still bus-safe range, +/-25% side level.
     if (wet.getNumChannels() >= 2 && std::abs (space) > 0.001f)
     {
-        const float width = 1.0f + 0.12f * space;
+        const float width = 1.0f + 0.25f * space;
         auto* l = wet.getWritePointer (0);
         auto* r = wet.getWritePointer (1);
-
         for (int i = 0; i < wet.getNumSamples(); ++i)
         {
             const float mid = 0.5f * (l[i] + r[i]);
@@ -1004,14 +1025,14 @@ void SculptBusAudioProcessor::processFineTune (juce::AudioBuffer<float>& wet,
         }
     }
 
-    // MIX blends the entire Sculpt Bus process against the untouched internal dry.
+    // MIX is now strictly POST-BANDS: 0% = four-band result, 100% = four-band result + Fine Tune.
     if (mix < 0.999f)
     {
         const float dryGain = 1.0f - mix;
         for (int ch = 0; ch < wet.getNumChannels(); ++ch)
         {
             auto* w = wet.getWritePointer (ch);
-            const auto* d = dry.getReadPointer (ch);
+            const auto* d = postBandsDry.getReadPointer (ch);
             for (int i = 0; i < wet.getNumSamples(); ++i)
                 w[i] = w[i] * mix + d[i] * dryGain;
         }
@@ -1021,9 +1042,6 @@ void SculptBusAudioProcessor::processFineTune (juce::AudioBuffer<float>& wet,
 void SculptBusAudioProcessor::processInternal (
     juce::AudioBuffer<float>& buffer)
 {
-    fineDry.setSize (buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
-    fineDry.makeCopyOf (buffer, true);
-
     const std::array<float, numMacroBands> macros {
         apvts.getRawParameterValue ("low")->load(),
         apvts.getRawParameterValue ("mid")->load(),
@@ -1034,11 +1052,9 @@ void SculptBusAudioProcessor::processInternal (
     const bool variationEnabled =
         apvts.getRawParameterValue ("variation")->load() > 0.5f;
 
-    analyseResonance (
-        buffer,
-        macros,
-        variationEnabled);
+    analyseResonance (buffer, macros, variationEnabled);
 
+    // The four-band engine is intentionally left untouched.
     for (int band = 0; band < numMacroBands; ++band)
     {
         processMacroBand (
@@ -1048,6 +1064,9 @@ void SculptBusAudioProcessor::processInternal (
             soothePressure[static_cast<size_t> (band)]);
     }
 
+    // Fine Tune starts HERE, after the approved four-band sound.
+    fineDry.setSize (buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+    fineDry.makeCopyOf (buffer, true);
     processFineTune (buffer, fineDry);
 }
 

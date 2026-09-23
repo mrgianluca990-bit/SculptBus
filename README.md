@@ -60,3 +60,13 @@ Changes:
 - Top 4 macro knobs, output knob, VAR switch, and all 7 lower fine-tune knobs were repositioned.
 - Meter windows were also nudged for tighter alignment.
 - DSP unchanged from v0.2 Fine Tune / v0.2.1.
+
+
+## v0.3 Post Fine Tune
+- Four macro bands are unchanged from the approved v0.2.2 sound.
+- Fine Tune now begins strictly after the four-band engine.
+- Mix blends only the post-band Fine Tune stage, so it no longer weakens the four-band result.
+- Density, Body, Detail, Glue, Punch and Space have substantially wider/more audible ranges.
+- Glue is the dedicated stereo-linked bus compressor with bus-style attack/release behaviour.
+- Punch is independently reactive even when Glue is low.
+- GUI positions were recalculated around the actual artwork scale axes.

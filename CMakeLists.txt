@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(SculptBus VERSION 0.2.2)
+project(SculptBus VERSION 0.3.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(APPLE)
@@ -17,7 +17,7 @@ if(APPLE)
 endif()
 juce_add_binary_data(SculptAssets
     SOURCES
-        assets/sculpt_bus_gui_bg_clean.png
+        assets/sculpt_bus_gui_bg_v03.png
 )
 juce_add_plugin(SculptBus
     COMPANY_NAME "Sculpt"
