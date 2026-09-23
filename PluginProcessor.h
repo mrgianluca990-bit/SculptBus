@@ -43,6 +43,7 @@ public:
     float getSatMeter (int band) const noexcept;
     float getInputMeter() const noexcept  { return inputMeter.load(); }
     float getOutputMeter() const noexcept { return outputMeter.load(); }
+    float getBusCompMeter() const noexcept { return busCompMeter.load(); }
 
 private:
     static constexpr int numMacroBands = 4;
@@ -82,6 +83,19 @@ private:
 
     juce::SmoothedValue<float> outputGain;
 
+    struct FineTuneFilter
+    {
+        juce::dsp::StateVariableTPTFilter<float> filter;
+        juce::AudioBuffer<float> work;
+    };
+
+    FineTuneFilter bodyFilter;
+    FineTuneFilter detailFilter;
+    juce::AudioBuffer<float> fineDry;
+
+    float busCompEnv = 0.0f;
+    float busCompGain = 1.0f;
+
     std::array<float, numMacroBands> soothePressure {};
 
     std::array<std::atomic<float>, numMacroBands> resMeters;
@@ -90,6 +104,7 @@ private:
 
     std::atomic<float> inputMeter  { 0.0f };
     std::atomic<float> outputMeter { 0.0f };
+    std::atomic<float> busCompMeter { 0.0f };
 
     static constexpr std::array<float, numResBands> resFrequencies
     {
@@ -119,6 +134,12 @@ private:
 
     float getBlockRMS (const juce::AudioBuffer<float>&) const noexcept;
     float curve (float magnitude) const noexcept;
+
+    void processFineTune (juce::AudioBuffer<float>& wet,
+                          const juce::AudioBuffer<float>& dry);
+    void processBusCompressor (juce::AudioBuffer<float>& buffer,
+                               float glue,
+                               float punch);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SculptBusAudioProcessor)
 };

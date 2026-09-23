@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(SculptBus VERSION 0.1.0)
+project(SculptBus VERSION 0.2.2)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(APPLE)
@@ -15,7 +15,10 @@ set(SCULPT_FORMATS VST3 Standalone)
 if(APPLE)
     list(APPEND SCULPT_FORMATS AU)
 endif()
-juce_add_binary_data(SculptAssets SOURCES assets/sculpt_gui_bg_precise.png)
+juce_add_binary_data(SculptAssets
+    SOURCES
+        assets/sculpt_bus_gui_bg_clean.png
+)
 juce_add_plugin(SculptBus
     COMPANY_NAME "Sculpt"
     BUNDLE_ID "audio.sculpt.bus"
