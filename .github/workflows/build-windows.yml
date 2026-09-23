@@ -1,0 +1,54 @@
+name: Build Sculpt Bus Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure x64
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel 3
+
+      - name: Verify VST3
+        shell: pwsh
+        run: |
+          $vst = "build/SculptBus_artefacts/Release/VST3/Sculpt Bus.vst3"
+          if (-not (Test-Path $vst)) {
+            throw "VST3 not found at $vst"
+          }
+
+      - name: Verify Standalone
+        shell: pwsh
+        run: |
+          $exe = "build/SculptBus_artefacts/Release/Standalone/Sculpt Bus.exe"
+          if (-not (Test-Path $exe)) {
+            throw "Standalone not found at $exe"
+          }
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: SculptBus-VST3-Windows-x64
+          path: build/SculptBus_artefacts/Release/VST3/Sculpt Bus.vst3
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: SculptBus-Standalone-Windows-x64
+          path: build/SculptBus_artefacts/Release/Standalone/Sculpt Bus.exe
+          if-no-files-found: error
